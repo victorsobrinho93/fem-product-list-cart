@@ -142,10 +142,10 @@ function cartComponent() {
                     return total + value.quantity;
                 }, 0)})</h1>
             </div>`);
-        Object.keys(shoppingCart).forEach((key, itemId) => {
+        // ! This loop should be made reusable, but that's for future projects.
+        Object.keys(shoppingCart).forEach((key) => {
             const { quantity, price } = shoppingCart[key];
-            const section =
-                $(`<div class="item-section" id=${`transaction-id-${itemId}`}>
+            const section = $(`<div class="item-section"}>
                         <div class="item-name">
                             <p>${key}</p>
                         </div>
@@ -158,21 +158,25 @@ function cartComponent() {
                                 quantity * price
                             ).toFixed(2)}</p>
                         </div>
-                        <a href="#" id=${`remove-transaction-${itemId}`} class="cart-rm"><img class="remove-btn" src="assets/images/icon-remove-item.svg" /></a>
                 </div>`);
 
-            section.append(new removeButton(key, itemId));
+            section.append(new removeButton(key));
 
             this.element.append(section);
         });
 
-        function removeButton(item, id) {
+        function removeButton(item) {
             this.element = $(
                 `<a href="#" class="cart-rm"><img class="remove-btn" src="assets/images/icon-remove-item.svg" /></a>`
             );
             this.element.on("click", () => {
-                const itemCard = shoppingCart[item].card;
-                $(itemCard > ".product-img").removeClass("selected-item");
+                const itemCard = `#${shoppingCart[item].card}`;
+                $(`${itemCard} > .product-img`).removeClass("selected-item");
+                $(`${itemCard} > .product-btn`).replaceWith(
+                    new handleProduct(shoppingCart[item])
+                ); /*
+                ! works but should be done better.
+                */
                 delete shoppingCart[item];
                 $("#shopping-cart").replaceWith(new cartComponent());
             });
@@ -195,6 +199,12 @@ function cartComponent() {
               <a href="#" id="confirm-order" class="confirm-order-btn">Confirm Order</button>
             </div>
             `);
+
+            this.element.on("click", ".confirm-order-btn", () => {
+                $("#container").append(new orderComponent());
+                $("body").addClass("no-scroll");
+            });
+
             return this.element;
         }
 
@@ -210,4 +220,70 @@ function cartComponent() {
     }
 
     return this.component;
+}
+
+function orderComponent() {
+    this.element = $(`<div id="order-wrapper">
+            <div class="order-confirmed">
+                <div class="oc-header">
+                    <img src="assets/images/icon-order-confirmed.svg" id="oc-icon" />
+                    <h1>Order Confirmed</h1>
+                    <p>We hope you enjoy your food!</p>
+                </div>
+            </div>
+        </div>
+    `);
+
+    this.element
+        .children(".order-confirmed")
+        .append(new handleOrderItems())
+        .append(
+            $(
+                `<a href="" class="start-new confirm-order-btn">Start New Order</div>`
+            )
+        );
+
+    function handleOrderItems() {
+        this.element = $(`<div class="oc-items-list"></div>`);
+        Object.keys(shoppingCart).forEach((item) => {
+            const { name, price, quantity, image } = shoppingCart[item];
+
+            this.element.append(
+                $(`
+                <div class="order-item">
+                    <div class="oi-img">
+                        <img src=${image.thumbnail} />
+                    </div>
+                    <p class="oi-name">${name}</p>
+                    <div class="oi-set">
+                        <p class="oi-quantity">${quantity}x</p>
+                        <p class="oi-price">@ ${price.toFixed(2)}</p>
+                    </div>
+                    <div class="oi-total">
+                      <p>$${(price * quantity).toFixed(2)}</p>
+                    </div>
+                </div>
+                `)
+            );
+        });
+        this.element.append(
+            $(`
+                <div class='oi-order-total'>
+                    <p>Order Total</p>
+                    <p class="ot-value">$${calculateOrderTotal()}</p>
+                </div>
+            `)
+        );
+        return this.element;
+    }
+
+    return this.element;
+}
+
+function calculateOrderTotal() {
+    return Object.values(shoppingCart)
+        .reduce((total, e) => {
+            return total + e.quantity * e.price;
+        }, 0)
+        .toFixed(2);
 }
