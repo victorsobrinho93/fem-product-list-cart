@@ -7,124 +7,115 @@ const shoppingCart = {};
 /*
 
 TODO: fix the redundant classes and divs in the item showcase button. It's breaking stuff.
-* gotta clean the code around productComponent, it's really messy for no reason.
+* gotta clean the code around productComponent, it's really messy for no reason. (mostly done).
 * refactor the item showcase to have its two modes share most of its style properties.
-* make item showcase image dynamic instead of static.
-* Add decimals to the prices and total.
+* make item showcase image dynamic instead of static
 * Finish styling
 * Add finish order screen.
 */
 
 $(document).ready(() => {
     $.getJSON("static/data.json", (data) => {
-        data.forEach((object, i) => {
-            $("#catalogue").append(new productComponent(object, i));
+        data.forEach((product, i) => {
+            product.quantity = 0;
+            product.card = `product-card-${i}`;
+            $("#catalogue").append(new productComponent(product, i));
         });
     });
     $("#container").append(new cartComponent());
 });
 
-function calculateItemPrice(name, defaultValue) {
-    this.element(`
-        <p>${name}</p>
-        `);
+function productComponent(product, i) {
+    const { mobile, desktop, tablet } = product["image"];
+    // todo: add script to decide what image is set.
+
+    this.element = $(`<div class="product" id=${product.card}>
+            <img class="product-img" src=${desktop} />
+            <div class="product-btn"></div>
+        </div>`);
+    this.element
+        .children(".product-btn")
+        .replaceWith(new handleProduct(product, i));
+    this.element.append(new productInformation(product, i));
     return this.element;
 }
 
-function productComponent(productObject, i) {
-    this.component = $("<div>")
-        .addClass("product")
-        .append(new productImage(productObject, i))
-        .append(new productInformation(productObject, i));
+function handleProduct(product) {
+    const { name } = product;
 
-    return this.component;
-}
-
-function productImage(productObject, i) {
-    this.component = $(`
-    <div class="item-showcase">
-      <img id=${`thumbnail-${i}`} src=${productObject.image["desktop"]} />
-    </div>
-    `);
-    this.component.append(new productButton(productObject, i));
-    return this.component;
-}
-
-function productButton({ name, price }, i) {
     function addItemToCart() {
-        const elementId = `add-btn-${i}`;
         this.element = $(`
-        <div id=${elementId} class="add-to-cart-btn">
+        <div class="product-btn add-to-cart-btn">
             <img src="assets/images/icon-add-to-cart.svg" />
             <p>Add to Cart</p>
         </div>
         `);
 
         this.element.on("click", () => {
-            shoppingCart[name] = {
-                price: price,
-                quantity: 1,
-            };
-            $(`#${elementId}`).replaceWith(new changeItemQuantity());
-            $(`#thumbnail-${i}`).addClass("selected-item");
-            handleCartChanges();
+            product.quantity = 1;
+            shoppingCart[name] = product;
+            this.element.replaceWith(new handleItemAmount());
+            refreshCart(name);
         });
 
         return this.element;
     }
 
-    function changeItemQuantity() {
-        const elementId = `quantity-${i}`;
-        const incrementButtonId = `add-item-${i}`;
-        const decrementButtonId = `remove-item-${i}`;
-
-        const updateQuantity = (change) => {
-            shoppingCart[name].quantity += change;
-            handleCartChanges();
-        };
-
+    function handleItemAmount() {
         this.element = $(`
-          <div id=${elementId} class="set-amount-btn">
-            <img src="assets/images/icon-decrement-quantity.svg" alt="" id=${decrementButtonId} class="operator-btn" />
-            <p id=${`item-quantity-${i}`}></p>
-            <img src="assets/images/icon-increment-quantity.svg" alt="" id=${incrementButtonId} class="operator-btn" />
-          </div>
-        `);
+                <div class="product-btn handle-amount">
+                    <img src="assets/images/icon-decrement-quantity.svg" alt="" class="operator-btn minus-btn" />
+                    <p class="item-amount">${shoppingCart[name].quantity}</p>
+                    <img src="assets/images/icon-increment-quantity.svg" class="operator-btn plus-btn" />
+                </div>
+            `);
 
-        this.element.on("click", `#${incrementButtonId}`, () =>
-            updateQuantity(1)
-        );
-        this.element.on("click", `#${decrementButtonId}`, () =>
-            updateQuantity(-1)
-        );
+        this.element.on("click", ".plus-btn", () => {
+            updateAmount(1);
+        });
+
+        this.element.on("click", ".minus-btn", () => {
+            updateAmount(-1);
+        });
+
+        function updateAmount(change) {
+            shoppingCart[name].quantity += change;
+            $(`#${product.card} > .product-btn`).replaceWith(
+                shoppingCart[name].quantity >= 1
+                    ? new handleItemAmount()
+                    : new addItemToCart()
+            );
+            refreshCart(name);
+        }
 
         return this.element;
     }
 
-    this.component = $(`<div class="product-thumbnail-btn"></div>`).append(
-        new addItemToCart()
-    );
-
-    function handleCartChanges() {
-        if (shoppingCart[name].quantity === 0) {
-            delete shoppingCart[name];
-            $(`#quantity-${i}`).replaceWith(new addItemToCart());
-            $(`#thumbnail-${i}`).removeClass("selected-item");
-        } else {
-            $(`#item-quantity-${i}`).text(shoppingCart[name].quantity);
-        }
-        $("#shopping-cart").replaceWith(new cartComponent());
-    }
-
-    return this.component;
+    return new addItemToCart();
 }
 
-function productInformation({ category, name, price }, i) {
+function refreshCart(name) {
+    if (name !== undefined && shoppingCart[name].quantity === 0) {
+        $(`#${shoppingCart[name].card} > .product-img`).removeClass(
+            "selected-item"
+        );
+        delete shoppingCart[name];
+    } else if (name !== undefined) {
+        $(`#${shoppingCart[name].card} > .product-img`).addClass(
+            "selected-item"
+        );
+    }
+
+    $("#shopping-cart").replaceWith(new cartComponent());
+}
+
+function productInformation(product) {
+    const { category, name, price } = product;
     return $(`
     <div class="product-info">
       <p class="category">${category}</p>
       <p class="name">${name}</p>
-      <p id=${`price-tag-${i}`} class="price">$${price.toFixed(2)}</p>
+      <p class="price">$${product.price.toFixed(2)}</p>
     </div>
   `);
 }
@@ -180,6 +171,8 @@ function cartComponent() {
                 `<a href="#" class="cart-rm"><img class="remove-btn" src="assets/images/icon-remove-item.svg" /></a>`
             );
             this.element.on("click", () => {
+                const itemCard = shoppingCart[item].card;
+                $(itemCard > ".product-img").removeClass("selected-item");
                 delete shoppingCart[item];
                 $("#shopping-cart").replaceWith(new cartComponent());
             });
